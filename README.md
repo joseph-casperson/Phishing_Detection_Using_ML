@@ -205,6 +205,6 @@ Evaluation metrics: Accuracy · Precision · Recall · F1 Score · Confusion Mat
 
 ## Author
 
-**[Your Name]**
+**Joseph Casperson**
 Cybersecurity Major — CS 4200
-[LinkedIn](https://linkedin.com/in/yourprofile) · [GitHub](https://github.com/yourusername)
+[LinkedIn](https://linkedin.com/in/joseph-casperson) · [GitHub](https://github.com/joseph-casperson)
