@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phishing Detection ML — Project Flow</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --accent4: #f59e0b;
+    --accent5: #ef4444;
+    --text: #e2e8f0;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
+    --mono: 'JetBrains Mono', monospace;
+    --display: 'Syne', sans-serif;
+    --body: 'DM Sans', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    font-weight: 300;
+    line-height: 1.7;
+    min-height: 100vh;
+  }
+
+  /* ── GRID NOISE BACKGROUND ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 32px 80px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 72px 0 56px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 56px;
+  }
+
+  .hero-eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .hero-eyebrow::before {
+    content: '';
+    display: inline-block;
+    width: 24px;
+    height: 1px;
+    background: var(--accent);
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(36px, 5vw, 58px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+  }
+  h1 span { color: var(--accent); }
+
+  .hero-sub {
+    font-size: 16px;
+    color: var(--text-dim);
+    max-width: 600px;
+    line-height: 1.7;
+    margin-bottom: 32px;
+  }
+
+  .badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 3px;
+    letter-spacing: 0.05em;
+  }
+  .badge-blue  { background: rgba(0,212,255,0.1);  color: var(--accent);  border: 1px solid rgba(0,212,255,0.25); }
+  .badge-purple{ background: rgba(124,58,237,0.1); color: #a78bfa;        border: 1px solid rgba(124,58,237,0.25); }
+  .badge-green { background: rgba(16,185,129,0.1); color: var(--accent3); border: 1px solid rgba(16,185,129,0.25); }
+  .badge-amber { background: rgba(245,158,11,0.1); color: var(--accent4); border: 1px solid rgba(245,158,11,0.25); }
+  .badge-red   { background: rgba(239,68,68,0.1);  color: var(--accent5); border: 1px solid rgba(239,68,68,0.25); }
+
+  /* ── SECTION HEADERS ── */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── PHASE CARDS ── */
+  .phase {
+    margin-bottom: 48px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface);
+    transition: border-color 0.2s;
+  }
+  .phase:hover { border-color: rgba(0,212,255,0.2); }
+
+  .phase-header {
+    display: grid;
+    grid-template-columns: 64px 1fr auto;
+    align-items: center;
+    gap: 20px;
+    padding: 24px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .phase-num {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .phase-meta { }
+  .phase-title {
+    font-family: var(--display);
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .phase-subtitle {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+  }
+
+  .phase-chapters {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .phase-body { padding: 28px; }
+
+  /* ── STEP LIST ── */
+  .steps { list-style: none; display: flex; flex-direction: column; gap: 16px; }
+  .step {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .step-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-top: 8px;
+    flex-shrink: 0;
+    justify-self: center;
+  }
+  .step-content {}
+  .step-title { font-weight: 500; color: var(--text); margin-bottom: 2px; font-size: 15px; }
+  .step-desc { font-size: 14px; color: var(--text-dim); line-height: 1.6; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: rgba(0,212,255,0.08);
+    color: var(--accent);
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid rgba(0,212,255,0.15);
+  }
+
+  /* ── CODE BLOCK ── */
+  .code-block {
+    background: #070c18;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px 24px;
+    margin-top: 16px;
+    overflow-x: auto;
+  }
+  .code-block-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot-red { background: #ef4444; }
+  .dot-yellow { background: #f59e0b; }
+  .dot-green { background: #10b981; }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.8;
+    color: var(--text-dim);
+    white-space: pre-wrap;
+  }
+  .cm { color: #4a5568; }
+  .kw { color: #7c3aed; font-weight: 700; }
+  .fn { color: var(--accent); }
+  .st { color: var(--accent3); }
+  .nm { color: var(--accent4); }
+  .op { color: #ec4899; }
+
+  /* ── CALLOUT BOXES ── */
+  .callout {
+    margin-top: 20px;
+    padding: 16px 20px;
+    border-radius: 6px;
+    border-left: 3px solid;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .callout-blue   { background: rgba(0,212,255,0.05);  border-color: var(--accent);  color: #93c5fd; }
+  .callout-green  { background: rgba(16,185,129,0.05); border-color: var(--accent3); color: #6ee7b7; }
+  .callout-amber  { background: rgba(245,158,11,0.05); border-color: var(--accent4); color: #fcd34d; }
+  .callout-purple { background: rgba(124,58,237,0.05); border-color: #7c3aed;        color: #c4b5fd; }
+  .callout strong { font-weight: 600; }
+
+  /* ── PIPELINE FLOW ── */
+  .pipeline {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin: 32px 0;
+    flex-wrap: wrap;
+  }
+  .pipeline-node {
+    flex: 1;
+    min-width: 120px;
+    text-align: center;
+    padding: 16px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    position: relative;
+  }
+  .pipeline-node:first-child { border-radius: 6px 0 0 6px; }
+  .pipeline-node:last-child  { border-radius: 0 6px 6px 0; }
+  .pipeline-node + .pipeline-node { border-left: none; }
+  .pipeline-node.active { border-color: var(--accent); background: rgba(0,212,255,0.06); }
+  .pipeline-icon { font-size: 20px; margin-bottom: 6px; }
+  .pipeline-label { font-family: var(--mono); font-size: 10px; color: var(--text-dim); letter-spacing: 0.05em; }
+  .pipeline-ch { font-family: var(--mono); font-size: 9px; color: var(--text-muted); margin-top: 4px; }
+
+  .arrow {
+    display: flex;
+    align-items: center;
+    color: var(--accent);
+    font-size: 16px;
+    padding: 0 4px;
+    flex-shrink: 0;
+  }
+
+  /* ── TECH STACK TABLE ── */
+  .tech-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .tech-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+  }
+  .tech-card-label { font-family: var(--mono); font-size: 10px; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .tech-card-value { font-size: 14px; color: var(--text); font-weight: 500; }
+
+  /* ── REPO STRUCTURE ── */
+  .repo-tree {
+    background: #070c18;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 2;
+  }
+  .tree-dir  { color: var(--accent); font-weight: 700; }
+  .tree-file { color: var(--text-dim); }
+  .tree-desc { color: var(--text-muted); font-size: 11px; }
+  .tree-indent { padding-left: 24px; display: block; }
+  .tree-indent2 { padding-left: 48px; display: block; }
+
+  /* ── DELIVERABLES TABLE ── */
+  .del-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .del-table th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .del-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(30,45,69,0.6);
+    vertical-align: top;
+    color: var(--text-dim);
+  }
+  .del-table tr:last-child td { border-bottom: none; }
+  .del-table td:first-child { color: var(--text); font-weight: 500; }
+  .check { color: var(--accent3); }
+  .partial { color: var(--accent4); }
+
+  /* ── SERVER SETUP SECTION ── */
+  .server-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+  }
+  .server-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+  }
+  .server-card h4 {
+    font-family: var(--display);
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .server-card p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+  .server-card .rec { font-family: var(--mono); font-size: 10px; color: var(--accent3); margin-top: 8px; }
+
+  /* ── RESPONSIVE ── */
+  @media(max-width: 600px) {
+    .phase-header { grid-template-columns: 48px 1fr; }
+    .phase-chapters { display: none; }
+    .server-grid { grid-template-columns: 1fr; }
+    .pipeline { flex-direction: column; }
+    .pipeline-node { border-radius: 0; border-left: 1px solid var(--border) !important; border-top: none; }
+    .pipeline-node:first-child { border-radius: 6px 6px 0 0; border-top: 1px solid var(--border); }
+    .pipeline-node:last-child  { border-radius: 0 0 6px 6px; }
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .phase { animation: fadeUp 0.4s ease both; }
+  .phase:nth-child(1) { animation-delay: 0.05s; }
+  .phase:nth-child(2) { animation-delay: 0.10s; }
+  .phase:nth-child(3) { animation-delay: 0.15s; }
+  .phase:nth-child(4) { animation-delay: 0.20s; }
+  .phase:nth-child(5) { animation-delay: 0.25s; }
+  .phase:nth-child(6) { animation-delay: 0.30s; }
+  .phase:nth-child(7) { animation-delay: 0.35s; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-eyebrow">CS 4200 — Final Project</div>
+    <h1>Phishing Detection<br><span>via Machine Learning</span></h1>
+    <p class="hero-sub">A complete end-to-end data science pipeline — from raw data on a home Ubuntu server to a trained phishing classifier in Python and R. Built for CS 4200; designed for a portfolio.</p>
+    <div class="badge-row">
+      <span class="badge badge-blue">Python</span>
+      <span class="badge badge-purple">R</span>
+      <span class="badge badge-green">PostgreSQL</span>
+      <span class="badge badge-amber">MongoDB</span>
+      <span class="badge badge-red">Ubuntu Server</span>
+      <span class="badge badge-blue">sklearn</span>
+      <span class="badge badge-purple">Ch. 8 · 9 · 11 · 4/5</span>
+    </div>
+  </div>
+
+  <!-- PIPELINE OVERVIEW -->
+  <div class="section-label">Pipeline Overview</div>
+  <div class="pipeline">
+    <div class="pipeline-node active">
+      <div class="pipeline-icon">🗄️</div>
+      <div class="pipeline-label">Server Setup</div>
+      <div class="pipeline-ch">Ubuntu + DBs</div>
+    </div>
+    <div class="pipeline-node">
+      <div class="pipeline-icon">📥</div>
+      <div class="pipeline-label">Ingest</div>
+      <div class="pipeline-ch">Raw CSV → DB</div>
+    </div>
+    <div class="pipeline-node">
+      <div class="pipeline-icon">🧹</div>
+      <div class="pipeline-label">Clean</div>
+      <div class="pipeline-ch">Ch. 9</div>
+    </div>
+    <div class="pipeline-node">
+      <div class="pipeline-icon">📊</div>
+      <div class="pipeline-label">Visualize</div>
+      <div class="pipeline-ch">Ch. 4/5</div>
+    </div>
+    <div class="pipeline-node">
+      <div class="pipeline-icon">🔬</div>
+      <div class="pipeline-label">Model</div>
+      <div class="pipeline-ch">Ch. 8 + 11</div>
+    </div>
+    <div class="pipeline-node">
+      <div class="pipeline-icon">📝</div>
+      <div class="pipeline-label">Report</div>
+      <div class="pipeline-ch">Write-up</div>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════
+       PHASE 0 — REPO & SERVER SETUP
+  ═════════════════════════════════════════════════ -->
+  <div class="section-label">Phase 0</div>
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="color:#00d4ff">00</div>
+      <div class="phase-meta">
+        <div class="phase-title">Repository &amp; Server Setup</div>
+        <div class="phase-subtitle">GitHub structure · Ubuntu server · PostgreSQL · MongoDB</div>
+      </div>
+      <div class="phase-chapters">
+        <span class="badge badge-red">Infrastructure</span>
+      </div>
+    </div>
+    <div class="phase-body">
+
+      <div class="section-label" style="margin-bottom:16px">GitHub Repo Structure</div>
+      <div class="repo-tree">
+        <span class="tree-dir">phishing-ml-detector/</span>
+        <span class="tree-indent tree-dir">├── data/</span>
+        <span class="tree-indent2 tree-file">├── raw/           <span class="tree-desc"># original CIC dataset CSV (gitignored if large)</span></span>
+        <span class="tree-indent2 tree-file">└── clean/         <span class="tree-desc"># cleaned CSV output from Phase 2</span></span>
+        <span class="tree-indent tree-dir">├── db/</span>
+        <span class="tree-indent2 tree-file">├── schema.sql     <span class="tree-desc"># PostgreSQL table definitions</span></span>
+        <span class="tree-indent2 tree-file">├── queries.sql    <span class="tree-desc"># all SQL analysis queries</span></span>
+        <span class="tree-indent2 tree-file">└── mongo_setup.js <span class="tree-desc"># MongoDB collection + index setup</span></span>
+        <span class="tree-indent tree-dir">├── notebooks/</span>
+        <span class="tree-indent2 tree-file">├── 01_ingest.ipynb       <span class="tree-desc"># load CSV into PostgreSQL</span></span>
+        <span class="tree-indent2 tree-file">├── 02_preprocessing.ipynb<span class="tree-desc"># Ch. 9 — cleaning pipeline</span></span>
+        <span class="tree-indent2 tree-file">├── 03_visualization.ipynb<span class="tree-desc"># Ch. 4/5 — EDA + charts</span></span>
+        <span class="tree-indent2 tree-file">└── 04_modeling.ipynb     <span class="tree-desc"># Ch. 8/11 — Python classifiers</span></span>
+        <span class="tree-indent tree-dir">├── r/</span>
+        <span class="tree-indent2 tree-file">├── pca_analysis.R   <span class="tree-desc"># PCA with factoextra</span></span>
+        <span class="tree-indent2 tree-file">└── classifiers.R    <span class="tree-desc"># R model implementations</span></span>
+        <span class="tree-indent tree-dir">├── visuals/</span>
+        <span class="tree-indent2 tree-file">└── *.png            <span class="tree-desc"># exported chart images for report</span></span>
+        <span class="tree-indent tree-file">├── requirements.txt   <span class="tree-desc"># Python dependencies</span></span>
+        <span class="tree-indent tree-file">├── .gitignore</span>
+        <span class="tree-indent tree-file">└── README.md          <span class="tree-desc"># this document</span></span>
+      </div>
+
+      <div class="section-label" style="margin-bottom:16px; margin-top:28px">Database Decision — PostgreSQL vs MongoDB</div>
+      <div class="server-grid">
+        <div class="server-card">
+          <h4 style="color:#00d4ff">PostgreSQL <span style="font-weight:300;color:#64748b">— Primary Store</span></h4>
+          <p>Structured tabular data with a fixed schema maps perfectly to a relational DB. Use this for your main URL and features tables. Enables the SQL queries required by Ch. 6, JOINs, aggregations, and Python's <code>psycopg2</code>/<code>sqlalchemy</code>.</p>
+          <div class="rec">✓ RECOMMENDED for primary data</div>
+        </div>
+        <div class="server-card">
+          <h4 style="color:#f59e0b">MongoDB <span style="font-weight:300;color:#64748b">— Supplementary Store</span></h4>
+          <p>Store your model run results and evaluation metrics as JSON documents. Each model run becomes a document: hyperparameters, split used, accuracy, F1, confusion matrix. This gives you a natural "experiment tracker" with no fixed schema.</p>
+          <div class="rec" style="color:#f59e0b">✓ RECOMMENDED for experiment logs</div>
+        </div>
+      </div>
+
+      <div class="callout callout-blue" style="margin-top:20px">
+        <strong>Why both?</strong> Using PostgreSQL for structured feature data and MongoDB for experiment results is a legitimate, production-style architecture pattern. It demonstrates you understand when to use relational vs. document stores — a real interview talking point. It also satisfies Chapter 7 (NoSQL) if your professor counts it.
+      </div>
+
+      <div class="section-label" style="margin-bottom:16px; margin-top:28px">Ubuntu Server Setup Commands</div>
+      <div class="code-block">
+        <div class="code-block-label">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          bash — ubuntu server
+        </div>
+        <pre><span class="cm"># Update system</span>
+sudo apt update && sudo apt upgrade -y
+
+<span class="cm"># Install PostgreSQL</span>
+sudo apt install -y postgresql postgresql-contrib
+sudo systemctl enable postgresql
+sudo systemctl start postgresql
+
+<span class="cm"># Create database and user</span>
+sudo -u postgres psql -c <span class="st">"CREATE USER phishuser WITH PASSWORD 'yourpassword';"</span>
+sudo -u postgres psql -c <span class="st">"CREATE DATABASE phishdb OWNER phishuser;"</span>
+
+<span class="cm"># Install MongoDB</span>
+curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | sudo gpg -o /usr/share/keyrings/mongodb.gpg --dearmor
+echo <span class="st">"deb [ arch=amd64 signed-by=/usr/share/keyrings/mongodb.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse"</span> | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+sudo apt update && sudo apt install -y mongodb-org
+sudo systemctl enable mongod && sudo systemctl start mongod
+
+<span class="cm"># Install Python environment</span>
+sudo apt install -y python3-pip python3-venv
+python3 -m venv venv && source venv/bin/activate
+pip install pandas numpy scikit-learn matplotlib seaborn plotly psycopg2-binary sqlalchemy pymongo jupyter notebook
+
+<span class="cm"># Install R</span>
+sudo apt install -y r-base
+sudo Rscript -e <span class="st">"install.packages(c('factoextra','cluster','fpc','randomForest','e1071','ggplot2'), repos='https://cran.r-project.org')"</span></pre>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════
+       PHASE 1 — DATA INGEST
+  ═════════════════════════════════════════════════ -->
+  <div class="section-label">Phase 1</div>
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="color:#7c3aed">01</div>
+      <div class="phase-meta">
+        <div class="phase-title">Data Ingestion</div>
+        <div class="phase-subtitle">Download dataset · Load into PostgreSQL · Validate record count</div>
+      </div>
+      <div class="phase-chapters">
+        <span class="badge badge-purple">Notebook 01</span>
+      </div>
+    </div>
+    <div class="phase-body">
+      <ul class="steps">
+        <li class="step">
+          <div class="step-dot" style="background:#7c3aed"></div>
+          <div class="step-content">
+            <div class="step-title">Download the CIC Phishing URL Dataset</div>
+            <div class="step-desc">Get the dataset from <code>unb.ca/cic/datasets/url-2016.html</code>. Place the raw CSV in <code>data/raw/</code>. Add this folder to <code>.gitignore</code> if the file exceeds GitHub's 100MB limit — instead commit a <code>data/raw/README.md</code> with the download link so others can reproduce.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#7c3aed"></div>
+          <div class="step-content">
+            <div class="step-title">Define PostgreSQL Schema</div>
+            <div class="step-desc">Create <code>db/schema.sql</code> with two tables: <code>urls</code> (url_id, url_string, label) and <code>features</code> (feature_id, url_id FK, url_length, num_subdomains, num_special_chars, https_flag, domain_age, ip_in_url, entropy). Apply it with <code>psql -U phishuser -d phishdb -f db/schema.sql</code>.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#7c3aed"></div>
+          <div class="step-content">
+            <div class="step-title">Load CSV → PostgreSQL via Python</div>
+            <div class="step-desc">In <code>01_ingest.ipynb</code>, use <code>pandas</code> + <code>sqlalchemy</code> to read the CSV and <code>df.to_sql()</code> into PostgreSQL. Run a SQL <code>COUNT(*)</code> after load to confirm the row count matches the CSV exactly. Log any discrepancies.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#7c3aed"></div>
+          <div class="step-content">
+            <div class="step-title">Set Up MongoDB Experiment Log</div>
+            <div class="step-desc">In <code>db/mongo_setup.js</code>, create a <code>phishdb</code> database with a <code>model_runs</code> collection. Each document will store: model name, split used, accuracy, precision, recall, F1, timestamp. Run this once with <code>mongosh mongo_setup.js</code>.</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════
+       PHASE 2 — PREPROCESSING (CH. 9)
+  ═════════════════════════════════════════════════ -->
+  <div class="section-label">Phase 2 — Chapter 9</div>
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="color:#10b981">02</div>
+      <div class="phase-meta">
+        <div class="phase-title">Data Preprocessing &amp; Cleansing</div>
+        <div class="phase-subtitle">Audit · Deduplicate · Normalize · Validate · Export clean CSV</div>
+      </div>
+      <div class="phase-chapters">
+        <span class="badge badge-green">Chapter 9</span>
+        <span class="badge badge-green">Notebook 02</span>
+      </div>
+    </div>
+    <div class="phase-body">
+      <ul class="steps">
+        <li class="step">
+          <div class="step-dot" style="background:#10b981"></div>
+          <div class="step-content">
+            <div class="step-title">Step 1 — Initial Audit (Python)</div>
+            <div class="step-desc">Run <code>df.info()</code>, <code>df.describe()</code>, <code>df.isnull().sum()</code>, <code>df.duplicated().sum()</code>. Create a "Data Quality Before" table. Screenshot this output — it goes directly in the report.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#10b981"></div>
+          <div class="step-content">
+            <div class="step-title">Step 2 — SQL Audit (PostgreSQL)</div>
+            <div class="step-desc">In <code>db/queries.sql</code>, write queries to detect duplicates (<code>GROUP BY url_string HAVING COUNT(*) &gt; 1</code>), NULL counts per column, and out-of-range values. Cross-reference results with the Python audit to confirm both tools agree.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#10b981"></div>
+          <div class="step-content">
+            <div class="step-title">Step 3 — Clean Operations</div>
+            <div class="step-desc">Remove exact duplicate rows. Handle NULLs (drop or median-impute for numeric columns — document your choice). Convert all URLs to lowercase. Confirm boolean columns are <code>int</code> dtype. Strip whitespace. Log every operation and the row count after each one.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#10b981"></div>
+          <div class="step-content">
+            <div class="step-title">Step 4 — Post-Clean Verification</div>
+            <div class="step-desc">Re-run the audit. Build a Before/After comparison table showing rows removed, nulls fixed, dtypes corrected. This table becomes a key figure in the report. Export the clean data to <code>data/clean/clean_urls.csv</code>. Write clean data back to a <code>clean_features</code> table in PostgreSQL.</div>
+          </div>
+        </li>
+      </ul>
+
+      <div class="code-block" style="margin-top:20px">
+        <div class="code-block-label"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span> python — 02_preprocessing.ipynb (key snippets)</div>
+        <pre><span class="kw">import</span> pandas <span class="kw">as</span> pd
+<span class="kw">from</span> sqlalchemy <span class="kw">import</span> create_engine
+
+engine = <span class="fn">create_engine</span>(<span class="st">"postgresql://phishuser:yourpassword@localhost/phishdb"</span>)
+df = pd.<span class="fn">read_sql</span>(<span class="st">"SELECT * FROM features JOIN urls USING (url_id)"</span>, engine)
+
+<span class="cm"># ── AUDIT BEFORE ──────────────────────────────────────</span>
+<span class="fn">print</span>(<span class="st">f"Shape: {df.shape}"</span>)
+<span class="fn">print</span>(<span class="st">f"Duplicates: {df.duplicated().sum()}"</span>)
+<span class="fn">print</span>(df.<span class="fn">isnull</span>().<span class="fn">sum</span>())
+
+<span class="cm"># ── CLEAN ─────────────────────────────────────────────</span>
+before = <span class="fn">len</span>(df)
+df = df.<span class="fn">drop_duplicates</span>()
+df[<span class="st">'url_string'</span>] = df[<span class="st">'url_string'</span>].<span class="fn">str.lower</span>().<span class="fn">str.strip</span>()
+df = df.<span class="fn">dropna</span>(subset=[<span class="st">'url_length'</span>, <span class="st">'label'</span>])
+after = <span class="fn">len</span>(df)
+<span class="fn">print</span>(<span class="st">f"Removed {before - after} rows"</span>)
+
+<span class="cm"># ── EXPORT ────────────────────────────────────────────</span>
+df.<span class="fn">to_csv</span>(<span class="st">"data/clean/clean_urls.csv"</span>, index=<span class="nm">False</span>)
+df.<span class="fn">to_sql</span>(<span class="st">"clean_features"</span>, engine, if_exists=<span class="st">"replace"</span>, index=<span class="nm">False</span>)</pre>
+      </div>
+
+      <div class="callout callout-amber">
+        <strong>GitHub tip:</strong> Commit after every phase with a descriptive message like <code>feat: add preprocessing pipeline with before/after audit</code>. Each phase = one commit. This shows a clean progression in your git history, which interviewers actually look at.
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════
+       PHASE 3 — VISUALIZATION (CH. 4/5)
+  ═════════════════════════════════════════════════ -->
+  <div class="section-label">Phase 3 — Chapters 4 &amp; 5</div>
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="color:#f59e0b">03</div>
+      <div class="phase-meta">
+        <div class="phase-title">EDA &amp; Visualization</div>
+        <div class="phase-subtitle">5 charts · 2+ chart types · Excel requirement · Pattern documentation</div>
+      </div>
+      <div class="phase-chapters">
+        <span class="badge badge-amber">Chapter 4</span>
+        <span class="badge badge-amber">Chapter 5</span>
+        <span class="badge badge-amber">Notebook 03</span>
+      </div>
+    </div>
+    <div class="phase-body">
+      <ul class="steps">
+        <li class="step">
+          <div class="step-dot" style="background:#f59e0b"></div>
+          <div class="step-content">
+            <div class="step-title">Chart 1 — Class Balance Bar Chart (Excel)</div>
+            <div class="step-desc">Export a summary CSV of label counts. Open in Excel, create a bar chart with proper axis labels, title, and legend. This satisfies the Chapter 5 Excel requirement. Screenshot the Excel filter panel too — use Sort to show the 20 longest phishing URLs.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#f59e0b"></div>
+          <div class="step-content">
+            <div class="step-title">Chart 2 — URL Length Histogram (Python/matplotlib)</div>
+            <div class="step-desc">Plot overlapping histograms of URL length by label (phishing vs. legitimate). Use <code>alpha=0.6</code> for transparency. Add vertical lines for mean values. This chart typically shows phishing URLs are significantly longer.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#f59e0b"></div>
+          <div class="step-content">
+            <div class="step-title">Chart 3 — Feature Correlation Heatmap (seaborn)</div>
+            <div class="step-desc">Plot a heatmap of all numeric feature correlations. Annotate with values. This chart directly motivates your PCA step in Phase 4 — if features are correlated, dimensionality reduction is justified.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#f59e0b"></div>
+          <div class="step-content">
+            <div class="step-title">Chart 4 — Subdomains Box Plot (seaborn)</div>
+            <div class="step-desc">Side-by-side box plots of subdomain count by label. Highlights outliers and median differences between phishing and legitimate URLs. This is a different chart type, satisfying the 2+ chart type requirement.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#f59e0b"></div>
+          <div class="step-content">
+            <div class="step-title">Chart 5 — 2D PCA Scatter Plot (matplotlib)</div>
+            <div class="step-desc">Run a quick 2-component PCA and plot samples colored by label. This is both a visualization AND a preview of your Phase 4 modeling work. If the two classes cluster separately, your models will perform well. Export all charts to <code>visuals/</code> as PNG.</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════
+       PHASE 4 — MODELING (CH. 8 + 11)
+  ═════════════════════════════════════════════════ -->
+  <div class="section-label">Phase 4 — Chapters 8 &amp; 11</div>
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="color:#a78bfa">04</div>
+      <div class="phase-meta">
+        <div class="phase-title">Classification — Python &amp; R</div>
+        <div class="phase-subtitle">PCA · 3 classifiers · 3 splits · Evaluation · Python vs R write-up</div>
+      </div>
+      <div class="phase-chapters">
+        <span class="badge badge-purple">Chapter 8</span>
+        <span class="badge badge-purple">Chapter 11</span>
+        <span class="badge badge-purple">Notebook 04</span>
+      </div>
+    </div>
+    <div class="phase-body">
+      <ul class="steps">
+        <li class="step">
+          <div class="step-dot" style="background:#a78bfa"></div>
+          <div class="step-content">
+            <div class="step-title">Step 1 — Feature Scaling + PCA (Python &amp; R)</div>
+            <div class="step-desc">Apply <code>StandardScaler</code> in Python before PCA. In R, use <code>prcomp(scale.=TRUE)</code>. Produce a scree plot in both languages. Choose components that capture ~90% of variance. Document the component count and explained variance ratio.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#a78bfa"></div>
+          <div class="step-content">
+            <div class="step-title">Step 2 — Python: 3 Classifiers × 3 Splits</div>
+            <div class="step-desc">Implement Logistic Regression, Random Forest, and SVM using <code>sklearn</code>. Loop over splits <code>[0.70, 0.80, 0.90]</code> for train size. For each combination, compute accuracy, precision, recall, F1. Save every result to MongoDB using <code>pymongo</code>. Generate a confusion matrix heatmap for each model at the 80/20 split.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#a78bfa"></div>
+          <div class="step-content">
+            <div class="step-title">Step 3 — R: Replicate Top 2 Models</div>
+            <div class="step-desc">In <code>r/classifiers.R</code>, implement Random Forest (<code>randomForest</code> package) and SVM (<code>e1071</code> package) at the 80/20 split. Use <code>factoextra::fviz_pca_ind()</code> for the PCA biplot. Compare R outputs to Python's — they should be close but not identical due to different implementations.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#a78bfa"></div>
+          <div class="step-content">
+            <div class="step-title">Step 4 — Python vs. R Compare &amp; Contrast Essay</div>
+            <div class="step-desc">Write a structured 300–400 word comparison in your report. Cover: syntax differences, ease of use, visualization quality, runtime performance, and personal preference for each use case. This is explicitly graded by the Chapter 8 rubric — treat it seriously.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#a78bfa"></div>
+          <div class="step-content">
+            <div class="step-title">Step 5 — Log All Runs to MongoDB</div>
+            <div class="step-desc">After each model run, insert a document into the <code>model_runs</code> MongoDB collection. Query the collection at the end to produce your master results table. This means your results are reproducible and queryable — not just hardcoded in a cell.</div>
+          </div>
+        </li>
+      </ul>
+
+      <div class="code-block" style="margin-top:20px">
+        <div class="code-block-label"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span> python — modeling loop with MongoDB logging</div>
+        <pre><span class="kw">from</span> sklearn.ensemble <span class="kw">import</span> RandomForestClassifier
+<span class="kw">from</span> sklearn.linear_model <span class="kw">import</span> LogisticRegression
+<span class="kw">from</span> sklearn.svm <span class="kw">import</span> SVC
+<span class="kw">from</span> sklearn.model_selection <span class="kw">import</span> train_test_split
+<span class="kw">from</span> sklearn.metrics <span class="kw">import</span> classification_report
+<span class="kw">from</span> pymongo <span class="kw">import</span> MongoClient
+<span class="kw">import</span> datetime
+
+client = <span class="fn">MongoClient</span>(<span class="st">"mongodb://localhost:27017/"</span>)
+runs = client.phishdb.model_runs
+
+models = {
+    <span class="st">"LogisticRegression"</span>: <span class="fn">LogisticRegression</span>(max_iter=<span class="nm">1000</span>),
+    <span class="st">"RandomForest"</span>:      <span class="fn">RandomForestClassifier</span>(n_estimators=<span class="nm">100</span>),
+    <span class="st">"SVM"</span>:               <span class="fn">SVC</span>(kernel=<span class="st">'rbf'</span>),
+}
+splits = [<span class="nm">0.70</span>, <span class="nm">0.80</span>, <span class="nm">0.90</span>]
+
+<span class="kw">for</span> split <span class="kw">in</span> splits:
+    X_train, X_test, y_train, y_test = <span class="fn">train_test_split</span>(
+        X_scaled, y, train_size=split, random_state=<span class="nm">42</span>)
+    <span class="kw">for</span> name, model <span class="kw">in</span> models.<span class="fn">items</span>():
+        model.<span class="fn">fit</span>(X_train, y_train)
+        report = <span class="fn">classification_report</span>(y_test, model.<span class="fn">predict</span>(X_test), output_dict=<span class="nm">True</span>)
+        runs.<span class="fn">insert_one</span>({
+            <span class="st">"model"</span>: name, <span class="st">"split"</span>: split,
+            <span class="st">"accuracy"</span>: report[<span class="st">"accuracy"</span>],
+            <span class="st">"precision"</span>: report[<span class="st">"weighted avg"</span>][<span class="st">"precision"</span>],
+            <span class="st">"recall"</span>: report[<span class="st">"weighted avg"</span>][<span class="st">"recall"</span>],
+            <span class="st">"f1"</span>: report[<span class="st">"weighted avg"</span>][<span class="st">"f1-score"</span>],
+            <span class="st">"timestamp"</span>: datetime.datetime.<span class="fn">utcnow</span>()
+        })</pre>
+      </div>
+
+      <div class="callout callout-purple">
+        <strong>MongoDB = automatic Chapter 7 coverage.</strong> By storing your experiment results in MongoDB and querying them with <code>mongosh</code> or pymongo, you can argue you've covered NoSQL analytics — even if it's not one of your primary chapters. It adds depth with almost no extra work.
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════
+       PHASE 5 — REPORT
+  ═════════════════════════════════════════════════ -->
+  <div class="section-label">Phase 5</div>
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="color:#64748b">05</div>
+      <div class="phase-meta">
+        <div class="phase-title">Report &amp; GitHub Polish</div>
+        <div class="phase-subtitle">Write-up · README · Screenshots · Final commit</div>
+      </div>
+      <div class="phase-chapters">
+        <span class="badge badge-blue">Deliverable</span>
+      </div>
+    </div>
+    <div class="phase-body">
+      <ul class="steps">
+        <li class="step">
+          <div class="step-dot" style="background:#64748b"></div>
+          <div class="step-content">
+            <div class="step-title">Write the report using the outline document</div>
+            <div class="step-desc">Each notebook maps to a section. Copy key outputs (charts, confusion matrices, results tables) from the notebooks directly into the Word document. The Python vs. R comparison essay goes in Section 5.7.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#64748b"></div>
+          <div class="step-content">
+            <div class="step-title">Write a thorough README.md</div>
+            <div class="step-desc">Include: project description, chapters covered, tech stack, how to reproduce (server setup commands, dataset download link, <code>pip install -r requirements.txt</code>, how to run each notebook in order). A good README is the first thing a recruiter looks at on a GitHub repo.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#64748b"></div>
+          <div class="step-content">
+            <div class="step-title">Add screenshots to the repo</div>
+            <div class="step-desc">Add a <code>screenshots/</code> folder with images of: PostgreSQL running on your server, MongoDB Compass or mongosh showing model run documents, key chart outputs, and the before/after preprocessing table. These prove the pipeline actually ran on real infrastructure.</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-dot" style="background:#64748b"></div>
+          <div class="step-content">
+            <div class="step-title">Final git push and tag</div>
+            <div class="step-desc">Make a final commit: <code>chore: finalize project — all phases complete</code>. Add a GitHub release tag <code>v1.0</code>. This makes it easy to link a specific version in your resume or LinkedIn project section.</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+
+  <!-- DELIVERABLES CHECKLIST -->
+  <div class="section-label">Deliverables Checklist</div>
+  <div class="phase" style="animation-delay:0.35s">
+    <div class="phase-body" style="padding:0">
+      <table class="del-table">
+        <thead>
+          <tr>
+            <th>Deliverable</th>
+            <th>Chapter</th>
+            <th>Location</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>PostgreSQL schema + SQL queries</td><td>Ch. 6 / Ch. 9</td><td><code>db/schema.sql</code>, <code>db/queries.sql</code></td><td><span class="partial">○ Todo</span></td></tr>
+          <tr><td>MongoDB model run logs</td><td>Ch. 7 (bonus)</td><td><code>db/mongo_setup.js</code> + pymongo</td><td><span class="partial">○ Todo</span></td></tr>
+          <tr><td>Preprocessing notebook + Before/After table</td><td>Ch. 9</td><td><code>notebooks/02_preprocessing.ipynb</code></td><td><span class="partial">○ Todo</span></td></tr>
+          <tr><td>5 charts (2+ types) incl. Excel chart</td><td>Ch. 4/5</td><td><code>notebooks/03_visualization.ipynb</code> + Excel</td><td><span class="partial">○ Todo</span></td></tr>
+          <tr><td>PCA scree plot (Python + R)</td><td>Ch. 8/11</td><td>Notebook 04 + <code>r/pca_analysis.R</code></td><td><span class="partial">○ Todo</span></td></tr>
+          <tr><td>3 classifiers × 3 splits (Python)</td><td>Ch. 11</td><td><code>notebooks/04_modeling.ipynb</code></td><td><span class="partial">○ Todo</span></td></tr>
+          <tr><td>R classifier implementations</td><td>Ch. 8</td><td><code>r/classifiers.R</code></td><td><span class="partial">○ Todo</span></td></tr>
+          <tr><td>Python vs. R compare essay (300–400 words)</td><td>Ch. 8</td><td>Report Section 5.7</td><td><span class="partial">○ Todo</span></td></tr>
+          <tr><td>Confusion matrix charts (per model)</td><td>Ch. 11</td><td><code>visuals/</code></td><td><span class="partial">○ Todo</span></td></tr>
+          <tr><td>Master results table (all models × splits)</td><td>Ch. 11</td><td>Report Section 5.6</td><td><span class="partial">○ Todo</span></td></tr>
+          <tr><td>GitHub README with reproduction steps</td><td>Portfolio</td><td><code>README.md</code></td><td><span class="partial">○ Todo</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TECH STACK -->
+  <div class="section-label" style="margin-top:48px">Tech Stack</div>
+  <div class="tech-grid">
+    <div class="tech-card"><div class="tech-card-label">Server</div><div class="tech-card-value">Ubuntu (home lab)</div></div>
+    <div class="tech-card"><div class="tech-card-label">Relational DB</div><div class="tech-card-value">PostgreSQL 16</div></div>
+    <div class="tech-card"><div class="tech-card-label">Document DB</div><div class="tech-card-value">MongoDB 7.0</div></div>
+    <div class="tech-card"><div class="tech-card-label">Python ML</div><div class="tech-card-value">sklearn · pandas · numpy</div></div>
+    <div class="tech-card"><div class="tech-card-label">Python Viz</div><div class="tech-card-value">matplotlib · seaborn · plotly</div></div>
+    <div class="tech-card"><div class="tech-card-label">R Packages</div><div class="tech-card-value">factoextra · cluster · e1071</div></div>
+    <div class="tech-card"><div class="tech-card-label">Notebooks</div><div class="tech-card-value">Jupyter (4 notebooks)</div></div>
+    <div class="tech-card"><div class="tech-card-label">Version Control</div><div class="tech-card-value">Git · GitHub</div></div>
+  </div>
+
+</div>
+</body>
+</html>

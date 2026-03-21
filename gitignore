@@ -1,0 +1,25 @@
+# Environment
+.env
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# Data — raw CSV is too large for GitHub
+data/raw/*.csv
+data/raw/*.zip
+data/clean/*.csv
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Credentials
+*.key
+*.pem
