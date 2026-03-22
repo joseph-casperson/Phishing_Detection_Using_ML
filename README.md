@@ -11,7 +11,7 @@ An end-to-end machine learning pipeline that classifies phishing URLs using stru
 
 > CS 4200 Final Project — Covers Chapters 4/5, 8, 9, and 11
 
-📄 **[View Full Project Flow →](docs/PROJECT_FLOW.html)**
+📄 **[View Full Project Flow →](https://joseph-casperson.github.io/Phishing_Detection_Using_ML/docs/PROJECT_FLOW.html)**
 
 ---
 
