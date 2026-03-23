@@ -1,322 +1,304 @@
 -- =============================================================================
 -- queries.sql
--- Phishing Detection ML Project — SQL Analysis Queries
+-- Phishing Detection ML Project — SQL Analysis Queries (Updated)
+-- Author: Joe Casperson
 -- =============================================================================
 -- HOW TO RUN:
---   Full file:      psql -U phishuser -d phishdb -f db/queries.sql
---   Single query:   Copy/paste into psql or a GUI like DBeaver / pgAdmin
+--   Full file:    psql -U phishuser -d phishdb -f db/queries.sql
+--   Single query: Copy/paste into psql or pgAdmin
 --
 -- SECTIONS:
---   1. Data Audit Queries          (Chapter 9 — Preprocessing)
---   2. Exploratory Analysis        (Chapter 6 — SQL in Your Toolset)
---   3. JOIN Demonstrations         (Chapter 6 — Join operations)
---   4. Aggregation & Reporting     (Chapter 6 — Aggregation functions)
---   5. Pre vs Post Clean Compare   (Chapter 9 — Verification)
+--   1. Data Audit Queries        (Chapter 9 — Preprocessing)
+--   2. Exploratory Analysis      (Chapter 6 — SQL in Your Toolset)
+--   3. JOIN Demonstrations       (Chapter 6 — Join operations)
+--   4. Aggregation & Reporting   (Chapter 6 — Aggregation functions)
+--   5. Pre vs Post Clean Compare (Chapter 9 — Verification)
 -- =============================================================================
 
 
 -- =============================================================================
 -- SECTION 1 — DATA AUDIT QUERIES
--- Run these on the RAW tables (urls, features) BEFORE cleaning.
--- Screenshot these results for the Chapter 9 "Before" section of your report.
+-- Run on the RAW urls table BEFORE cleaning.
+-- Screenshot these for the Chapter 9 "Before" section of your report.
 -- =============================================================================
 
--- 1a. Total record count — confirm it matches the CSV row count
+-- 1a. Total record count — confirm it matches CSV row count
 SELECT COUNT(*) AS total_records
 FROM urls;
 
--- 1b. Class distribution — how many phishing vs. legitimate?
+-- 1b. Class distribution — phishing vs benign
 SELECT
     label,
-    CASE WHEN label = 1 THEN 'Phishing' ELSE 'Legitimate' END AS label_name,
-    COUNT(*)                                                   AS count,
-    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2)        AS pct
+    CASE WHEN label = 1 THEN 'Phishing' ELSE 'Benign' END AS label_name,
+    COUNT(*)                                               AS count,
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2)    AS pct
 FROM urls
 GROUP BY label
 ORDER BY label DESC;
 
--- 1c. Find exact duplicate URL strings
---     Any url_string appearing more than once is a duplicate.
+-- 1c. NULL counts across key feature columns
 SELECT
-    url_string,
-    COUNT(*) AS occurrences
-FROM urls
-GROUP BY url_string
-HAVING COUNT(*) > 1
-ORDER BY occurrences DESC
-LIMIT 20;
+    COUNT(*) FILTER (WHERE urllen              IS NULL) AS null_urllen,
+    COUNT(*) FILTER (WHERE domain_token_count  IS NULL) AS null_domain_tokens,
+    COUNT(*) FILTER (WHERE entropy_url         IS NULL) AS null_entropy_url,
+    COUNT(*) FILTER (WHERE symbolcount_url     IS NULL) AS null_symbolcount,
+    COUNT(*) FILTER (WHERE numberrate_url      IS NULL) AS null_numberrate,
+    COUNT(*) FILTER (WHERE label               IS NULL) AS null_label
+FROM urls;
 
--- 1d. Count total duplicate rows
-SELECT COUNT(*) AS duplicate_count
+-- 1d. Duplicate row count
+SELECT COUNT(*) AS duplicate_rows
 FROM (
-    SELECT url_string
+    SELECT urllen, domain_token_count, entropy_url,
+           symbolcount_url, label, COUNT(*) AS cnt
     FROM urls
-    GROUP BY url_string
+    GROUP BY urllen, domain_token_count, entropy_url,
+             symbolcount_url, label
     HAVING COUNT(*) > 1
 ) AS dupes;
 
--- 1e. NULL / missing value counts per feature column
+-- 1e. Value range check — spot any impossible or suspicious values
 SELECT
-    COUNT(*) FILTER (WHERE url_length        IS NULL) AS null_url_length,
-    COUNT(*) FILTER (WHERE num_subdomains    IS NULL) AS null_num_subdomains,
-    COUNT(*) FILTER (WHERE num_special_chars IS NULL) AS null_num_special_chars,
-    COUNT(*) FILTER (WHERE https_flag        IS NULL) AS null_https_flag,
-    COUNT(*) FILTER (WHERE ip_in_url         IS NULL) AS null_ip_in_url,
-    COUNT(*) FILTER (WHERE domain_age_days   IS NULL) AS null_domain_age,
-    COUNT(*) FILTER (WHERE url_entropy       IS NULL) AS null_entropy,
-    COUNT(*) FILTER (WHERE num_digits        IS NULL) AS null_num_digits,
-    COUNT(*) FILTER (WHERE path_length       IS NULL) AS null_path_length
-FROM features;
-
--- 1f. Check for suspicious / out-of-range values
-SELECT
-    MIN(url_length)        AS min_url_len,
-    MAX(url_length)        AS max_url_len,
-    MIN(num_subdomains)    AS min_subdomains,
-    MAX(num_subdomains)    AS max_subdomains,
-    MIN(num_special_chars) AS min_special,
-    MAX(num_special_chars) AS max_special,
-    MIN(url_entropy)       AS min_entropy,
-    MAX(url_entropy)       AS max_entropy
-FROM features;
+    MIN(urllen)             AS min_urllen,
+    MAX(urllen)             AS max_urllen,
+    MIN(entropy_url)        AS min_entropy,
+    MAX(entropy_url)        AS max_entropy,
+    MIN(domain_token_count) AS min_domain_tokens,
+    MAX(domain_token_count) AS max_domain_tokens,
+    MIN(symbolcount_url)    AS min_symbols,
+    MAX(symbolcount_url)    AS max_symbols
+FROM urls;
 
 
 -- =============================================================================
 -- SECTION 2 — EXPLORATORY ANALYSIS
--- These queries reveal patterns in the CLEAN data that support your EDA section.
--- Screenshot results and reference them in Sections 3 and 4 of your report.
+-- Run on clean_urls AFTER preprocessing.
+-- Screenshot for Sections 3 and 4 of your report.
 -- =============================================================================
 
--- 2a. Average feature values by label — the core comparison
+-- 2a. Average feature values by label — the core comparison table
 SELECT
-    u.label,
-    CASE WHEN u.label = 1 THEN 'Phishing' ELSE 'Legitimate' END AS label_name,
-    ROUND(AVG(f.url_length),        2) AS avg_url_length,
-    ROUND(AVG(f.num_subdomains),    2) AS avg_subdomains,
-    ROUND(AVG(f.num_special_chars), 2) AS avg_special_chars,
-    ROUND(AVG(f.url_entropy),       4) AS avg_entropy,
-    ROUND(AVG(f.num_digits),        2) AS avg_digits,
-    ROUND(AVG(f.path_length),       2) AS avg_path_length
-FROM clean_urls u
-JOIN clean_features f ON u.url_id = f.url_id
-GROUP BY u.label
-ORDER BY u.label DESC;
+    CASE WHEN label = 1 THEN 'Phishing' ELSE 'Benign' END AS label_name,
+    ROUND(AVG(urllen),              2) AS avg_url_length,
+    ROUND(AVG(domain_token_count),  2) AS avg_domain_tokens,
+    ROUND(AVG(entropy_url),         4) AS avg_entropy_url,
+    ROUND(AVG(entropy_domain),      4) AS avg_entropy_domain,
+    ROUND(AVG(symbolcount_url),     2) AS avg_symbols,
+    ROUND(AVG(numberrate_url),      4) AS avg_number_rate,
+    ROUND(AVG(numberofdotsinurl),   2) AS avg_dots_in_url,
+    ROUND(AVG(path_token_count),    2) AS avg_path_tokens
+FROM clean_urls
+GROUP BY label
+ORDER BY label DESC;
 
--- 2b. HTTPS usage breakdown — what % of each class uses HTTPS?
+-- 2b. URL length distribution buckets by label
 SELECT
-    u.label,
-    CASE WHEN u.label = 1 THEN 'Phishing' ELSE 'Legitimate' END AS label_name,
-    SUM(f.https_flag)                                             AS uses_https,
-    COUNT(*)                                                      AS total,
-    ROUND(SUM(f.https_flag) * 100.0 / COUNT(*), 2)               AS pct_https
-FROM clean_urls u
-JOIN clean_features f ON u.url_id = f.url_id
-GROUP BY u.label
-ORDER BY u.label DESC;
-
--- 2c. IP-in-URL breakdown — strong phishing indicator
-SELECT
-    u.label,
-    CASE WHEN u.label = 1 THEN 'Phishing' ELSE 'Legitimate' END AS label_name,
-    SUM(f.ip_in_url)                                              AS uses_ip,
-    COUNT(*)                                                      AS total,
-    ROUND(SUM(f.ip_in_url) * 100.0 / COUNT(*), 2)                AS pct_ip_in_url
-FROM clean_urls u
-JOIN clean_features f ON u.url_id = f.url_id
-GROUP BY u.label
-ORDER BY u.label DESC;
-
--- 2d. URL length distribution buckets — shows how length differs by class
-SELECT
-    CASE WHEN u.label = 1 THEN 'Phishing' ELSE 'Legitimate' END AS label_name,
+    CASE WHEN label = 1 THEN 'Phishing' ELSE 'Benign' END AS label_name,
     CASE
-        WHEN f.url_length < 30  THEN 'Short  (<30)'
-        WHEN f.url_length < 75  THEN 'Medium (30-74)'
-        WHEN f.url_length < 150 THEN 'Long   (75-149)'
-        ELSE                         'Very Long (150+)'
+        WHEN urllen < 50  THEN 'Short  (<50)'
+        WHEN urllen < 100 THEN 'Medium (50-99)'
+        WHEN urllen < 200 THEN 'Long   (100-199)'
+        ELSE                   'Very Long (200+)'
     END AS length_bucket,
     COUNT(*) AS count
-FROM clean_urls u
-JOIN clean_features f ON u.url_id = f.url_id
-GROUP BY u.label, length_bucket
-ORDER BY u.label DESC, length_bucket;
+FROM clean_urls
+GROUP BY label, length_bucket
+ORDER BY label DESC, length_bucket;
 
--- 2e. Top 10 longest phishing URLs (useful for Excel sort/filter demo)
+-- 2c. Entropy distribution — high entropy suggests random/obfuscated URLs
 SELECT
-    u.url_string,
-    f.url_length,
-    f.num_subdomains,
-    f.num_special_chars,
-    f.https_flag
-FROM clean_urls u
-JOIN clean_features f ON u.url_id = f.url_id
-WHERE u.label = 1
-ORDER BY f.url_length DESC
+    CASE WHEN label = 1 THEN 'Phishing' ELSE 'Benign' END AS label_name,
+    CASE
+        WHEN entropy_url < 2.0 THEN 'Low    (<2.0)'
+        WHEN entropy_url < 3.0 THEN 'Medium (2.0-2.9)'
+        WHEN entropy_url < 4.0 THEN 'High   (3.0-3.9)'
+        ELSE                        'Very High (4.0+)'
+    END AS entropy_bucket,
+    COUNT(*) AS count
+FROM clean_urls
+WHERE entropy_url IS NOT NULL
+GROUP BY label, entropy_bucket
+ORDER BY label DESC, entropy_bucket;
+
+-- 2d. Symbol count comparison — phishing URLs typically have more symbols
+SELECT
+    CASE WHEN label = 1 THEN 'Phishing' ELSE 'Benign' END AS label_name,
+    ROUND(AVG(symbolcount_url),        2) AS avg_url_symbols,
+    ROUND(AVG(symbolcount_domain),     2) AS avg_domain_symbols,
+    ROUND(AVG(symbolcount_filename),   2) AS avg_filename_symbols,
+    ROUND(AVG(symbolcount_afterpath),  2) AS avg_afterpath_symbols
+FROM clean_urls
+GROUP BY label
+ORDER BY label DESC;
+
+-- 2e. Top 10 longest URLs in the phishing class
+SELECT
+    url_id,
+    urllen,
+    domain_token_count,
+    entropy_url,
+    symbolcount_url
+FROM clean_urls
+WHERE label = 1
+ORDER BY urllen DESC
 LIMIT 10;
 
 
 -- =============================================================================
 -- SECTION 3 — JOIN DEMONSTRATIONS
--- The rubric requires illustrating different JOIN types and contrasting them.
--- These queries use the same base tables but return different result sets.
--- Screenshot all three and explain the difference in your report.
+-- Required by rubric: illustrate different JOIN types and contrast effects.
+-- Both tables (urls, clean_urls) have identical structure — we join them
+-- on url_id to compare raw vs clean values for the same records.
+-- Screenshot all three outputs and explain the difference in your report.
 -- =============================================================================
 
--- 3a. INNER JOIN — only rows that exist in BOTH tables
---     This is the standard query. Every URL that has feature data appears.
---     Use case: analysis where you need complete records only.
+-- 3a. INNER JOIN — only records that exist in BOTH raw and clean tables
+--     Use case: verify which records survived preprocessing unchanged
 SELECT
-    u.url_id,
-    u.label,
-    f.url_length,
-    f.num_subdomains,
-    f.https_flag
-FROM clean_urls u
-INNER JOIN clean_features f ON u.url_id = f.url_id
+    r.url_id,
+    r.label,
+    r.urllen        AS raw_urllen,
+    c.urllen        AS clean_urllen,
+    r.entropy_url   AS raw_entropy,
+    c.entropy_url   AS clean_entropy
+FROM urls r
+INNER JOIN clean_urls c ON r.url_id = c.url_id
 LIMIT 10;
 
--- 3b. LEFT JOIN — all URLs, even those missing feature rows
---     If a URL was loaded but features were not computed, it still appears
---     with NULL values. Use case: data quality check — spot missing feature rows.
+-- 3b. LEFT JOIN — all raw records, with clean values where they exist
+--     NULLs on the right side = rows that were removed during cleaning
+--     Use case: identify exactly which raw rows were dropped and why
 SELECT
-    u.url_id,
-    u.url_string,
-    u.label,
-    f.url_length,       -- will be NULL if no matching feature row
-    f.num_subdomains
-FROM clean_urls u
-LEFT JOIN clean_features f ON u.url_id = f.url_id
-ORDER BY f.url_length NULLS FIRST  -- NULLs surface first — easy to spot
+    r.url_id,
+    r.label,
+    r.urllen,
+    c.url_id        AS clean_id,    -- NULL if row was removed during cleaning
+    c.urllen        AS clean_urllen
+FROM urls r
+LEFT JOIN clean_urls c ON r.url_id = c.url_id
+ORDER BY c.url_id NULLS FIRST       -- removed rows appear at the top
 LIMIT 15;
 
--- 3c. How many URLs are missing feature rows? (LEFT JOIN anomaly detection)
---     Result should be 0 in a clean dataset. Non-zero = data pipeline issue.
-SELECT COUNT(*) AS urls_without_features
-FROM clean_urls u
-LEFT JOIN clean_features f ON u.url_id = f.url_id
-WHERE f.feature_id IS NULL;
+-- 3c. Count how many raw rows did NOT survive preprocessing
+SELECT COUNT(*) AS rows_removed_by_cleaning
+FROM urls r
+LEFT JOIN clean_urls c ON r.url_id = c.url_id
+WHERE c.url_id IS NULL;
 
--- 3d. SELF JOIN — compare each phishing URL's length against the average
---     phishing URL length. Shows which phishing URLs are abnormally long.
+-- 3d. Aggregated JOIN — compare average feature values raw vs clean side by side
+--     Shows that cleaning did not significantly skew the distributions
 SELECT
-    u.url_id,
-    f.url_length,
-    ROUND(avg_data.avg_len, 2)                    AS avg_phishing_length,
-    f.url_length - ROUND(avg_data.avg_len, 2)     AS deviation
-FROM clean_urls u
-JOIN clean_features f ON u.url_id = f.url_id
-JOIN (
-    SELECT AVG(f2.url_length) AS avg_len
-    FROM clean_urls u2
-    JOIN clean_features f2 ON u2.url_id = f2.url_id
-    WHERE u2.label = 1
-) AS avg_data ON TRUE
-WHERE u.label = 1
-ORDER BY deviation DESC
-LIMIT 15;
+    'raw'                              AS dataset,
+    ROUND(AVG(urllen),        2)       AS avg_urllen,
+    ROUND(AVG(entropy_url),   4)       AS avg_entropy,
+    ROUND(AVG(symbolcount_url), 2)     AS avg_symbols,
+    COUNT(*)                           AS total_rows
+FROM urls
+UNION ALL
+SELECT
+    'clean'                            AS dataset,
+    ROUND(AVG(urllen),        2)       AS avg_urllen,
+    ROUND(AVG(entropy_url),   4)       AS avg_entropy,
+    ROUND(AVG(symbolcount_url), 2)     AS avg_symbols,
+    COUNT(*)                           AS total_rows
+FROM clean_urls;
 
 
 -- =============================================================================
 -- SECTION 4 — AGGREGATION & REPORTING
--- Uses GROUP BY, HAVING, COUNT, AVG, MAX, MIN, ROUND, and window functions.
--- These are the "reporting queries" a data analyst would hand to a manager.
+-- Uses GROUP BY, HAVING, COUNT, AVG, MAX, MIN, ROUND, window functions.
+-- These are the reporting queries — screenshot for Chapter 6 of your report.
 -- =============================================================================
 
--- 4a. Feature summary statistics by label (full report table)
+-- 4a. Full feature summary statistics by label
 SELECT
-    CASE WHEN u.label = 1 THEN 'Phishing' ELSE 'Legitimate' END AS label_name,
-    COUNT(*)                               AS total_urls,
-    ROUND(AVG(f.url_length),    1)         AS avg_length,
-    MAX(f.url_length)                      AS max_length,
-    MIN(f.url_length)                      AS min_length,
-    ROUND(AVG(f.num_subdomains), 2)        AS avg_subdomains,
-    ROUND(AVG(f.url_entropy),    4)        AS avg_entropy,
-    SUM(f.ip_in_url)                       AS total_ip_in_url,
-    SUM(f.https_flag)                      AS total_https
-FROM clean_urls u
-JOIN clean_features f ON u.url_id = f.url_id
-GROUP BY u.label
-ORDER BY u.label DESC;
+    CASE WHEN label = 1 THEN 'Phishing' ELSE 'Benign' END AS label_name,
+    COUNT(*)                               AS total_records,
+    ROUND(AVG(urllen),            1)       AS avg_url_length,
+    MAX(urllen)                            AS max_url_length,
+    MIN(urllen)                            AS min_url_length,
+    ROUND(AVG(entropy_url),       4)       AS avg_entropy,
+    ROUND(AVG(domain_token_count),2)       AS avg_domain_tokens,
+    ROUND(AVG(symbolcount_url),   2)       AS avg_symbols,
+    ROUND(AVG(numberofdotsinurl), 2)       AS avg_dots
+FROM clean_urls
+GROUP BY label
+ORDER BY label DESC;
 
--- 4b. Subdomain count frequency — how common is each subdomain count?
+-- 4b. Domain token count frequency — how complex are phishing domains?
 SELECT
-    u.label,
-    CASE WHEN u.label = 1 THEN 'Phishing' ELSE 'Legitimate' END AS label_name,
-    f.num_subdomains,
+    CASE WHEN label = 1 THEN 'Phishing' ELSE 'Benign' END AS label_name,
+    domain_token_count,
     COUNT(*) AS frequency
-FROM clean_urls u
-JOIN clean_features f ON u.url_id = f.url_id
-GROUP BY u.label, f.num_subdomains
-HAVING COUNT(*) > 50           -- only show common counts
-ORDER BY u.label DESC, f.num_subdomains;
+FROM clean_urls
+GROUP BY label, domain_token_count
+HAVING COUNT(*) > 100
+ORDER BY label DESC, domain_token_count;
 
--- 4c. Entropy percentile buckets — high entropy = more random = more suspicious
+-- 4c. High-risk profile count
+--     URLs with multiple simultaneous phishing indicators
 SELECT
-    CASE WHEN u.label = 1 THEN 'Phishing' ELSE 'Legitimate' END AS label_name,
-    CASE
-        WHEN f.url_entropy < 2.0 THEN 'Low    (<2.0)'
-        WHEN f.url_entropy < 3.0 THEN 'Medium (2.0-2.9)'
-        WHEN f.url_entropy < 4.0 THEN 'High   (3.0-3.9)'
-        ELSE                          'Very High (4.0+)'
-    END AS entropy_bucket,
-    COUNT(*) AS count
-FROM clean_urls u
-JOIN clean_features f ON u.url_id = f.url_id
-WHERE f.url_entropy IS NOT NULL
-GROUP BY u.label, entropy_bucket
-ORDER BY u.label DESC, entropy_bucket;
-
--- 4d. Dangerous combination count
---     Count URLs that have MULTIPLE phishing indicators simultaneously.
---     (long URL + no HTTPS + IP in URL = very high risk profile)
-SELECT
-    CASE WHEN u.label = 1 THEN 'Phishing' ELSE 'Legitimate' END AS label_name,
-    COUNT(*) AS high_risk_url_count
-FROM clean_urls u
-JOIN clean_features f ON u.url_id = f.url_id
+    CASE WHEN label = 1 THEN 'Phishing' ELSE 'Benign' END AS label_name,
+    COUNT(*) AS high_risk_count
+FROM clean_urls
 WHERE
-    f.url_length        > 75  AND
-    f.https_flag        = 0   AND
-    f.num_subdomains    > 2
-GROUP BY u.label
-ORDER BY u.label DESC;
+    urllen              > 100  AND
+    entropy_url         > 3.5  AND
+    symbolcount_url     > 10
+GROUP BY label
+ORDER BY label DESC;
+
+-- 4d. Number rate analysis — ratio of digits in URL components
+SELECT
+    CASE WHEN label = 1 THEN 'Phishing' ELSE 'Benign' END AS label_name,
+    ROUND(AVG(numberrate_url),          4) AS avg_numberrate_url,
+    ROUND(AVG(numberrate_domain),       4) AS avg_numberrate_domain,
+    ROUND(AVG(numberrate_directoryname),4) AS avg_numberrate_dir,
+    ROUND(AVG(numberrate_afterpath),    4) AS avg_numberrate_afterpath
+FROM clean_urls
+GROUP BY label
+ORDER BY label DESC;
 
 
 -- =============================================================================
--- SECTION 5 — PRE vs. POST CLEAN COMPARISON
--- Run these after Phase 2 (preprocessing) is complete.
--- Shows the measurable impact of cleaning — key figure for Chapter 9.
+-- SECTION 5 — PRE vs POST CLEAN COMPARISON
+-- Run after notebook 02 completes.
+-- Key figures for Chapter 9 — shows cleaning pipeline worked correctly.
 -- =============================================================================
 
--- 5a. Row count before and after cleaning
+-- 5a. Row count before and after
 SELECT 'raw'   AS dataset, COUNT(*) AS total_rows FROM urls
 UNION ALL
 SELECT 'clean' AS dataset, COUNT(*) AS total_rows FROM clean_urls;
 
--- 5b. Class balance before and after — check cleaning didn't skew the labels
+-- 5b. Class balance before and after — cleaning must not skew labels
 SELECT
-    'raw'      AS dataset,
-    SUM(CASE WHEN label = 1 THEN 1 ELSE 0 END) AS phishing_count,
-    SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) AS legitimate_count
+    'raw'                                                      AS dataset,
+    SUM(CASE WHEN label = 1 THEN 1 ELSE 0 END)                AS phishing_count,
+    SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END)                AS benign_count,
+    ROUND(AVG(CASE WHEN label = 1 THEN 1.0 ELSE 0.0 END), 4)  AS phishing_rate
 FROM urls
 UNION ALL
 SELECT
-    'clean'    AS dataset,
-    SUM(CASE WHEN label = 1 THEN 1 ELSE 0 END) AS phishing_count,
-    SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) AS legitimate_count
+    'clean'                                                    AS dataset,
+    SUM(CASE WHEN label = 1 THEN 1 ELSE 0 END)                AS phishing_count,
+    SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END)                AS benign_count,
+    ROUND(AVG(CASE WHEN label = 1 THEN 1.0 ELSE 0.0 END), 4)  AS phishing_rate
 FROM clean_urls;
 
--- 5c. Feature averages before and after — cleaning should not shift these much
+-- 5c. Feature averages before and after — should be nearly identical
 SELECT
-    'raw'                                   AS dataset,
-    ROUND(AVG(url_length),        2)        AS avg_url_length,
-    ROUND(AVG(num_subdomains),    2)        AS avg_subdomains,
-    ROUND(AVG(num_special_chars), 2)        AS avg_special_chars
-FROM features
+    'raw'                                AS dataset,
+    ROUND(AVG(urllen),          2)       AS avg_urllen,
+    ROUND(AVG(entropy_url),     4)       AS avg_entropy,
+    ROUND(AVG(symbolcount_url), 2)       AS avg_symbols,
+    ROUND(AVG(domain_token_count), 2)    AS avg_domain_tokens
+FROM urls
 UNION ALL
 SELECT
-    'clean'                                 AS dataset,
-    ROUND(AVG(url_length),        2)        AS avg_url_length,
-    ROUND(AVG(num_subdomains),    2)        AS avg_subdomains,
-    ROUND(AVG(num_special_chars), 2)        AS avg_special_chars
-FROM clean_features;
+    'clean'                              AS dataset,
+    ROUND(AVG(urllen),          2)       AS avg_urllen,
+    ROUND(AVG(entropy_url),     4)       AS avg_entropy,
+    ROUND(AVG(symbolcount_url), 2)       AS avg_symbols,
+    ROUND(AVG(domain_token_count), 2)    AS avg_domain_tokens
+FROM clean_urls;

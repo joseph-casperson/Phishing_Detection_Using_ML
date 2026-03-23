@@ -1,117 +1,218 @@
 -- =============================================================================
 -- schema.sql
--- Phishing Detection ML Project — PostgreSQL Schema
+-- Phishing Detection ML Project — PostgreSQL Schema (Updated)
+-- Author: Joe Casperson
 -- =============================================================================
 -- HOW TO RUN:
 --   psql -U phishuser -d phishdb -f db/schema.sql
 --
 -- TABLES:
---   urls          → one row per URL string with its ground-truth label
---   features      → one row per URL with all engineered numeric features
---   clean_urls    → post-preprocessing copy of urls (populated in Phase 2)
---   clean_features→ post-preprocessing copy of features (populated in Phase 2)
+--   urls       → raw data exactly as loaded from Phishing.csv
+--   clean_urls → post-preprocessing copy (populated in notebook 02)
+--
+-- NOTE:
+--   The CIC Phishing dataset is fully pre-engineered — there is no raw URL
+--   string column. All 79 columns are numeric features. The label column
+--   (URL_Type_obf_Type) is encoded as: 1 = phishing, 0 = benign.
 -- =============================================================================
 
 
 -- -----------------------------------------------------------------------------
 -- 0. CLEAN SLATE
---    Drop tables in reverse dependency order (features before urls)
---    so re-running this script is safe during development
 -- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS clean_features;
-DROP TABLE IF EXISTS clean_urls;
-DROP TABLE IF EXISTS features;
-DROP TABLE IF EXISTS urls;
+DROP TABLE IF EXISTS clean_urls CASCADE;
+DROP TABLE IF EXISTS urls CASCADE;
 
 
 -- -----------------------------------------------------------------------------
--- 1. urls
---    Stores the raw URL string and its binary classification label.
---    This is the "parent" table — features references it via url_id.
+-- 1. urls — raw data table
 -- -----------------------------------------------------------------------------
 CREATE TABLE urls (
-    url_id      SERIAL PRIMARY KEY,         -- auto-incrementing unique ID
-    url_string  TEXT        NOT NULL,       -- the raw URL (e.g. http://evil.xyz/login)
-    label       SMALLINT    NOT NULL        -- 1 = phishing, 0 = legitimate
-                CHECK (label IN (0, 1)),
-    inserted_at TIMESTAMPTZ DEFAULT NOW()   -- when this row was loaded
+    url_id                         SERIAL PRIMARY KEY,
+    label                          SMALLINT NOT NULL CHECK (label IN (0, 1)),
+    querylength                    NUMERIC,
+    domain_token_count             NUMERIC,
+    path_token_count               NUMERIC,
+    avgdomaintokenlen              NUMERIC,
+    longdomaintokenlen             NUMERIC,
+    avgpathtokenlen                NUMERIC,
+    tld                            NUMERIC,
+    charcompvowels                 NUMERIC,
+    charcompace                    NUMERIC,
+    ldl_url                        NUMERIC,
+    ldl_domain                     NUMERIC,
+    ldl_path                       NUMERIC,
+    ldl_filename                   NUMERIC,
+    ldl_getarg                     NUMERIC,
+    dld_url                        NUMERIC,
+    dld_domain                     NUMERIC,
+    dld_path                       NUMERIC,
+    dld_filename                   NUMERIC,
+    dld_getarg                     NUMERIC,
+    urllen                         NUMERIC,
+    domainlength                   NUMERIC,
+    pathlength                     NUMERIC,
+    subdirlen                      NUMERIC,
+    filenamelen                    NUMERIC,
+    fileextlen                     NUMERIC,
+    arglen                         NUMERIC,
+    pathurlratio                   NUMERIC,
+    argurlratio                    NUMERIC,
+    argdomanratio                  NUMERIC,
+    domainurlratio                 NUMERIC,
+    pathdomainratio                NUMERIC,
+    argpathratio                   NUMERIC,
+    executable                     NUMERIC,
+    isporteighty                   NUMERIC,
+    numberofdotsinurl              NUMERIC,
+    isipaddressindomainname        NUMERIC,
+    charactercontinuityrate        NUMERIC,
+    longestvariablevalue           NUMERIC,
+    url_digitcount                 NUMERIC,
+    host_digitcount                NUMERIC,
+    directory_digitcount           NUMERIC,
+    file_name_digitcount           NUMERIC,
+    extension_digitcount           NUMERIC,
+    query_digitcount               NUMERIC,
+    url_letter_count               NUMERIC,
+    host_letter_count              NUMERIC,
+    directory_lettercount          NUMERIC,
+    filename_lettercount           NUMERIC,
+    extension_lettercount          NUMERIC,
+    query_lettercount              NUMERIC,
+    longestpathtokenlength         NUMERIC,
+    domain_longestwordlength       NUMERIC,
+    path_longestwordlength         NUMERIC,
+    subdirectory_longestwordlength NUMERIC,
+    arguments_longestwordlength    NUMERIC,
+    url_sensitiveword              NUMERIC,
+    urlqueries_variable            NUMERIC,
+    spcharurl                      NUMERIC,
+    delimeter_domain               NUMERIC,
+    delimeter_path                 NUMERIC,
+    delimeter_count                NUMERIC,
+    numberrate_url                 NUMERIC,
+    numberrate_domain              NUMERIC,
+    numberrate_directoryname       NUMERIC,
+    numberrate_filename            NUMERIC,
+    numberrate_extension           NUMERIC,
+    numberrate_afterpath           NUMERIC,
+    symbolcount_url                NUMERIC,
+    symbolcount_domain             NUMERIC,
+    symbolcount_directoryname      NUMERIC,
+    symbolcount_filename           NUMERIC,
+    symbolcount_extension          NUMERIC,
+    symbolcount_afterpath          NUMERIC,
+    entropy_url                    NUMERIC,
+    entropy_domain                 NUMERIC,
+    entropy_directoryname          NUMERIC,
+    entropy_filename               NUMERIC,
+    entropy_extension              NUMERIC,
+    entropy_afterpath              NUMERIC,
+    inserted_at                    TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index on label for fast GROUP BY / WHERE label = 1 queries
-CREATE INDEX idx_urls_label ON urls(label);
+CREATE INDEX idx_urls_label   ON urls(label);
+CREATE INDEX idx_urls_urllen  ON urls(urllen);
+CREATE INDEX idx_urls_entropy ON urls(entropy_url);
 
 
 -- -----------------------------------------------------------------------------
--- 2. features
---    Stores all engineered numeric features for each URL.
---    Foreign key → urls.url_id (one-to-one relationship).
---
---    Feature descriptions:
---      url_length        → total character count of the URL string
---      num_subdomains    → count of dot-separated subdomain segments
---      num_special_chars → count of special chars (@, -, _, %, =, ?)
---      https_flag        → 1 if URL starts with https://, else 0
---      ip_in_url         → 1 if an IP address appears instead of a domain
---      domain_age_days   → age of the domain in days (-1 if unknown)
---      url_entropy       → Shannon entropy of the URL string (randomness score)
---      num_digits        → count of digit characters in the URL
---      path_length       → character count of the URL path component only
--- -----------------------------------------------------------------------------
-CREATE TABLE features (
-    feature_id        SERIAL PRIMARY KEY,
-    url_id            INTEGER     NOT NULL REFERENCES urls(url_id) ON DELETE CASCADE,
-
-    url_length        INTEGER     NOT NULL CHECK (url_length >= 0),
-    num_subdomains    INTEGER     NOT NULL CHECK (num_subdomains >= 0),
-    num_special_chars INTEGER     NOT NULL CHECK (num_special_chars >= 0),
-    https_flag        SMALLINT    NOT NULL CHECK (https_flag IN (0, 1)),
-    ip_in_url         SMALLINT    NOT NULL CHECK (ip_in_url IN (0, 1)),
-    domain_age_days   INTEGER     NOT NULL DEFAULT -1,  -- -1 = unknown/not available
-    url_entropy       NUMERIC(6,4),                     -- e.g. 3.8412
-    num_digits        INTEGER     NOT NULL DEFAULT 0 CHECK (num_digits >= 0),
-    path_length       INTEGER     NOT NULL DEFAULT 0 CHECK (path_length >= 0)
-);
-
--- Index on url_id for fast JOIN performance
-CREATE INDEX idx_features_url_id ON features(url_id);
-
-
--- -----------------------------------------------------------------------------
--- 3. clean_urls / clean_features
---    Mirror tables populated during Phase 2 (preprocessing).
---    Keeping raw and clean data in separate tables lets you compare them
---    with SQL queries and proves the cleaning pipeline worked.
+-- 2. clean_urls — post-preprocessing mirror table
+--    Identical structure. Populated by notebook 02.
 -- -----------------------------------------------------------------------------
 CREATE TABLE clean_urls (
-    url_id      SERIAL PRIMARY KEY,
-    url_string  TEXT        NOT NULL,
-    label       SMALLINT    NOT NULL CHECK (label IN (0, 1)),
-    inserted_at TIMESTAMPTZ DEFAULT NOW()
+    url_id                         SERIAL PRIMARY KEY,
+    label                          SMALLINT NOT NULL CHECK (label IN (0, 1)),
+    querylength                    NUMERIC,
+    domain_token_count             NUMERIC,
+    path_token_count               NUMERIC,
+    avgdomaintokenlen              NUMERIC,
+    longdomaintokenlen             NUMERIC,
+    avgpathtokenlen                NUMERIC,
+    tld                            NUMERIC,
+    charcompvowels                 NUMERIC,
+    charcompace                    NUMERIC,
+    ldl_url                        NUMERIC,
+    ldl_domain                     NUMERIC,
+    ldl_path                       NUMERIC,
+    ldl_filename                   NUMERIC,
+    ldl_getarg                     NUMERIC,
+    dld_url                        NUMERIC,
+    dld_domain                     NUMERIC,
+    dld_path                       NUMERIC,
+    dld_filename                   NUMERIC,
+    dld_getarg                     NUMERIC,
+    urllen                         NUMERIC,
+    domainlength                   NUMERIC,
+    pathlength                     NUMERIC,
+    subdirlen                      NUMERIC,
+    filenamelen                    NUMERIC,
+    fileextlen                     NUMERIC,
+    arglen                         NUMERIC,
+    pathurlratio                   NUMERIC,
+    argurlratio                    NUMERIC,
+    argdomanratio                  NUMERIC,
+    domainurlratio                 NUMERIC,
+    pathdomainratio                NUMERIC,
+    argpathratio                   NUMERIC,
+    executable                     NUMERIC,
+    isporteighty                   NUMERIC,
+    numberofdotsinurl              NUMERIC,
+    isipaddressindomainname        NUMERIC,
+    charactercontinuityrate        NUMERIC,
+    longestvariablevalue           NUMERIC,
+    url_digitcount                 NUMERIC,
+    host_digitcount                NUMERIC,
+    directory_digitcount           NUMERIC,
+    file_name_digitcount           NUMERIC,
+    extension_digitcount           NUMERIC,
+    query_digitcount               NUMERIC,
+    url_letter_count               NUMERIC,
+    host_letter_count              NUMERIC,
+    directory_lettercount          NUMERIC,
+    filename_lettercount           NUMERIC,
+    extension_lettercount          NUMERIC,
+    query_lettercount              NUMERIC,
+    longestpathtokenlength         NUMERIC,
+    domain_longestwordlength       NUMERIC,
+    path_longestwordlength         NUMERIC,
+    subdirectory_longestwordlength NUMERIC,
+    arguments_longestwordlength    NUMERIC,
+    url_sensitiveword              NUMERIC,
+    urlqueries_variable            NUMERIC,
+    spcharurl                      NUMERIC,
+    delimeter_domain               NUMERIC,
+    delimeter_path                 NUMERIC,
+    delimeter_count                NUMERIC,
+    numberrate_url                 NUMERIC,
+    numberrate_domain              NUMERIC,
+    numberrate_directoryname       NUMERIC,
+    numberrate_filename            NUMERIC,
+    numberrate_extension           NUMERIC,
+    numberrate_afterpath           NUMERIC,
+    symbolcount_url                NUMERIC,
+    symbolcount_domain             NUMERIC,
+    symbolcount_directoryname      NUMERIC,
+    symbolcount_filename           NUMERIC,
+    symbolcount_extension          NUMERIC,
+    symbolcount_afterpath          NUMERIC,
+    entropy_url                    NUMERIC,
+    entropy_domain                 NUMERIC,
+    entropy_directoryname          NUMERIC,
+    entropy_filename               NUMERIC,
+    entropy_extension              NUMERIC,
+    entropy_afterpath              NUMERIC,
+    inserted_at                    TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_clean_urls_label ON clean_urls(label);
-
-CREATE TABLE clean_features (
-    feature_id        SERIAL PRIMARY KEY,
-    url_id            INTEGER     NOT NULL REFERENCES clean_urls(url_id) ON DELETE CASCADE,
-
-    url_length        INTEGER     NOT NULL CHECK (url_length >= 0),
-    num_subdomains    INTEGER     NOT NULL CHECK (num_subdomains >= 0),
-    num_special_chars INTEGER     NOT NULL CHECK (num_special_chars >= 0),
-    https_flag        SMALLINT    NOT NULL CHECK (https_flag IN (0, 1)),
-    ip_in_url         SMALLINT    NOT NULL CHECK (ip_in_url IN (0, 1)),
-    domain_age_days   INTEGER     NOT NULL DEFAULT -1,
-    url_entropy       NUMERIC(6,4),
-    num_digits        INTEGER     NOT NULL DEFAULT 0 CHECK (num_digits >= 0),
-    path_length       INTEGER     NOT NULL DEFAULT 0 CHECK (path_length >= 0)
-);
-
-CREATE INDEX idx_clean_features_url_id ON clean_features(url_id);
+CREATE INDEX idx_clean_urls_label   ON clean_urls(label);
+CREATE INDEX idx_clean_urls_urllen  ON clean_urls(urllen);
+CREATE INDEX idx_clean_urls_entropy ON clean_urls(entropy_url);
 
 
 -- -----------------------------------------------------------------------------
--- 4. VERIFY
---    After running this file, this query should return all 4 table names.
+-- 3. VERIFY — should return: clean_urls, urls
 -- -----------------------------------------------------------------------------
 SELECT table_name
 FROM information_schema.tables
