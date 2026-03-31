@@ -17,10 +17,7 @@ cat("── Loading packages ─────────────────
 
 required <- c("randomForest", "e1071", "caret", "ggplot2")
 for (pkg in required) {
-  if (!require(pkg, character.only = TRUE, quietly = TRUE)) {
-    install.packages(pkg, repos = "https://cran.r-project.org", quiet = TRUE)
-    library(pkg, character.only = TRUE)
-  }
+  library(pkg, character.only = TRUE)
 }
 
 cat("✓ Packages loaded\n\n")
@@ -33,6 +30,21 @@ cat("── Loading clean dataset ───────────────�
 
 df    <- read.csv("data/clean/clean_urls.csv", stringsAsFactors = FALSE)
 X_raw <- as.matrix(df[, colnames(df) != "label"])
+
+# Replace Inf/-Inf with NA then median impute
+X_raw <- as.data.frame(X_raw)
+X_raw[X_raw == Inf | X_raw == -Inf] <- NA
+for (col in colnames(X_raw)) {
+  if (any(is.na(X_raw[[col]]))) {
+    X_raw[[col]][is.na(X_raw[[col]])] <- median(X_raw[[col]], na.rm = TRUE)
+  }
+}
+zero_var_cols <- sapply(X_raw, function(col) var(col, na.rm = TRUE) == 0)
+if (any(zero_var_cols)) {
+  cat(sprintf("  Removing %d zero-variance columns\n", sum(zero_var_cols)))
+  X_raw <- X_raw[, !zero_var_cols]
+}
+X_raw <- as.matrix(X_raw)
 y     <- as.factor(df$label)
 
 # Scale features (equivalent to Python StandardScaler)
@@ -190,50 +202,4 @@ print(comparison, row.names = FALSE)
 cat("\n  → Fill in Python NA values from notebook 04 master results table.\n")
 
 
-# =============================================================================
-# 7. Python vs R Compare and Contrast
-# =============================================================================
-cat("\n")
-cat("=============================================================================\n")
-cat("CHAPTER 8 REQUIREMENT: Python vs R Compare and Contrast\n")
-cat("=============================================================================\n")
-cat("\n")
-cat("Copy this section into your report (Section 5.7) and expand with\n")
-cat("your actual metric values and personal observations.\n\n")
 
-cat("SYNTAX AND API DIFFERENCES\n")
-cat("  Python (sklearn) uses a consistent object-oriented API:\n")
-cat("    model.fit(X_train, y_train) then model.predict(X_test)\n")
-cat("  This uniformity makes it easy to swap models in a loop.\n\n")
-cat("  R uses package-specific interfaces:\n")
-cat("    randomForest(x=, y=) vs svm(x=, y=) — each has different parameters.\n")
-cat("  More verbose but each function exposes richer statistical output.\n\n")
-
-cat("VISUALIZATION\n")
-cat("  Python matplotlib/seaborn: more control, better for custom layouts,\n")
-cat("  interactive output via plotly. Requires more code for polish.\n\n")
-cat("  R ggplot2/factoextra: publication-quality plots with less code.\n")
-cat("  fviz_pca_ind() produces a biplot with confidence ellipses in 2 lines.\n")
-cat("  ggplot2 grammar is declarative and readable.\n\n")
-
-cat("PERFORMANCE\n")
-cat("  Python sklearn is faster on large datasets due to C/Cython backends.\n")
-cat("  R randomForest is competitive for moderate datasets but slower at scale.\n")
-cat("  SVM in both languages is the slowest model — R's e1071 uses libsvm\n")
-cat("  (same underlying library as sklearn), so runtimes are comparable.\n\n")
-
-cat("RESULTS CONSISTENCY\n")
-cat("  Both languages should produce very similar (not identical) metrics\n")
-cat("  because they use the same underlying algorithms. Minor differences\n")
-cat("  come from implementation details and random seed handling.\n\n")
-
-cat("PERSONAL PREFERENCE\n")
-cat("  For production ML pipelines and deployment: Python.\n")
-cat("  The ecosystem (sklearn, pandas, FastAPI) is unmatched for end-to-end work.\n\n")
-cat("  For statistical analysis and academic reporting: R.\n")
-cat("  factoextra and ggplot2 produce cleaner outputs for research figures.\n")
-cat("  For a cybersecurity role, Python is the clear choice — most SIEM\n")
-cat("  integrations, threat intel tools, and automation scripts are Python-first.\n\n")
-
-cat("=============================================================================\n")
-cat("\n✓ classifiers.R complete\n")

@@ -18,10 +18,7 @@ cat("── Loading packages ─────────────────
 # Install packages if not already present
 required <- c("factoextra", "ggplot2")
 for (pkg in required) {
-  if (!require(pkg, character.only = TRUE, quietly = TRUE)) {
-    install.packages(pkg, repos = "https://cran.r-project.org", quiet = TRUE)
-    library(pkg, character.only = TRUE)
-  }
+  library(pkg, character.only = TRUE)
 }
 
 cat("✓ Packages loaded\n\n")
@@ -42,6 +39,27 @@ cat(sprintf("  Benign   : %d (%.1f%%)\n\n",
 
 # Separate features and labels
 X <- df[, colnames(df) != "label"]
+# Remove zero-variance and infinite value columns before PCA
+X <- as.data.frame(X)
+
+# Replace Inf/-Inf with NA then median impute
+X[X == Inf | X == -Inf] <- NA
+for (col in colnames(X)) {
+  if (any(is.na(X[[col]]))) {
+    X[[col]][is.na(X[[col]])] <- median(X[[col]], na.rm = TRUE)
+  }
+}
+
+# Remove zero-variance columns (prcomp cannot handle these)
+zero_var_cols <- sapply(X, function(col) var(col, na.rm = TRUE) == 0)
+if (any(zero_var_cols)) {
+  cat(sprintf("  Removing %d zero-variance columns: %s\n",
+              sum(zero_var_cols),
+              paste(names(zero_var_cols)[zero_var_cols], collapse = ", ")))
+  X <- X[, !zero_var_cols]
+}
+
+X <- as.matrix(X)
 y <- as.factor(df$label)
 
 
